@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Thiện Xạ Trắc Nghiệm - Sci-Fi Edition</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Tone.js for Sound -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    
+    <!-- KaTeX for rendering Math formulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-green: #00ff66;
+            --neon-red: #ff003c;
+            --neon-orange: #ffaa00;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000; /* Viền đen ngoài cùng khi chiếu trên màn hình sai tỉ lệ */
+            font-family: 'Inter', system-ui, Roboto, sans-serif;
+            color: #f3f4f6;
+            overflow: hidden;
+            touch-action: none; /* Khóa cuộn/zoom trên mobile */
+            -webkit-user-select: none; /* Chống bôi đen văn bản khi click liên tục */
+            user-select: none;
+        }
+
+        #app-wrapper {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            margin: auto;
+            width: 100%;
+            height: 100%;
+            max-width: 177.78vh; /* Giữ chuẩn tỉ lệ 16:9 tối đa, chống giãn trên màn siêu rộng */
+            background-color: #050505;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.15);
+        }
+        
+        .font-scifi { font-family: 'Orbitron', sans-serif; }
+        .katex { font-size: 1.4em !important; }
+        #game-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            cursor: none; /* Ẩn con trỏ mặc định */
+            z-index: 10;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+        }
+
+        .screen {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(5, 5, 10, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 50;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .screen.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(1.05);
+            display: flex !important; 
+        }
+
+        .hud-hidden { display: none !important; }
+
+        .glass-panel {
+            background: linear-gradient(135deg, rgba(20, 30, 48, 0.95), rgba(36, 59, 85, 0.95));
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(0, 243, 255, 0.3);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .option-box {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid #1e293b;
+            transition: all 0.3s ease;
+        }
+
+        .text-glow-blue { text-shadow: 0 0 15px var(--neon-blue), 0 0 5px rgba(255,255,255,0.5); }
+        .text-glow-green { text-shadow: 0 0 15px var(--neon-green), 0 0 5px rgba(255,255,255,0.5); }
+        .text-glow-red { text-shadow: 0 0 15px var(--neon-red), 0 0 5px rgba(255,255,255,0.5); }
+        .text-glow-orange { text-shadow: 0 0 15px var(--neon-orange), 0 0 5px rgba(255,255,255,0.5); }
+
+        .option-correct-highlight {
+            border-color: var(--neon-green) !important;
+            background-color: rgba(0, 255, 102, 0.15) !important;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.4) !important;
+            transform: scale(1.02);
+            z-index: 10;
+        }
+
+        @keyframes flash {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        .flash-overlay {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 15;
+        }
+        .flash-active { animation: flash 0.25s ease-out; }
+        .flash-green { background: radial-gradient(circle, rgba(0,255,102,0.3) 0%, transparent 80%); }
+        .flash-red { background: radial-gradient(circle, rgba(255,0,60,0.3) 0%, transparent 80%); }
+        .flash-white { background-color: rgba(255, 255, 255, 0.2); }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 15px rgba(0, 243, 255, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(0, 243, 255, 0.8), 0 0 15px rgba(255,255,255,0.6); }
+            100% { box-shadow: 0 0 15px rgba(0, 243, 255, 0.4); }
+        }
+        .btn-start { animation: pulse-glow 2s infinite; }
+        
+        .bg-freeze { background-color: rgba(0, 243, 255, 0.15) !important; transition: background-color 0.3s; }
+        
+        .hide-scrollbar::-webkit-scrollbar { width: 6px; }
+        .hide-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
+        .hide-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 243, 255, 0.5); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="app-wrapper">
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen">
+        <div class="text-center p-4 md:p-10 max-w-3xl bg-gray-900/90 rounded-3xl border border-gray-700/80 shadow-[0_0_40px_rgba(0,243,255,0.2)] backdrop-blur-xl transition-all w-11/12 flex flex-col items-center max-h-[95vh] overflow-y-auto hide-scrollbar">
+            <h1 class="font-sans tracking-widest text-3xl md:text-5xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#00f3ff] to-[#00ff66] mb-2 text-glow-blue mt-4">
+                THIỆN XẠ TRẮC NGHIỆM
+            </h1>
+            <p class="mb-6 md:mb-8 text-cyan-300/80 text-xs md:text-lg font-scifi tracking-wider">CHUYÊN ĐỀ: BẤT PHƯƠNG TRÌNH BẬC NHẤT HAI ẨN</p>
+            
+            <!-- RULE BLOCK -->
+            <div class="bg-gray-800/80 p-4 md:p-6 rounded-2xl border border-cyan-500/40 mb-6 md:mb-8 text-left text-gray-200 w-full max-w-2xl text-base md:text-lg leading-relaxed shadow-inner">
+                <h3 class="font-scifi text-cyan-400 text-lg md:text-2xl font-bold mb-3 md:mb-4 text-center border-b border-gray-700 pb-2 tracking-widest">HƯỚNG DẪN CHIẾN ĐẤU</h3>
+                <ul class="space-y-3 md:space-y-4">
+                    <li class="flex items-start gap-3">
+                        <span class="text-lg md:text-2xl drop-shadow-md">🎯</span>
+                        <span><strong>Nhiệm vụ:</strong> Điều khiển tháp pháo, ngắm và bắn vào Mục tiêu (Drone) mang <strong>đáp án đúng</strong>.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="text-lg md:text-2xl drop-shadow-md">⏱️</span>
+                        <span><strong>Chiến dịch:</strong> Tiêu diệt 5 mục tiêu liên tiếp trong thời gian giới hạn là <strong>60 giây</strong>.</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="text-lg md:text-2xl drop-shadow-md">✨</span>
+                        <span><strong>Vật phẩm:</strong> Bắn khối Băng <span class="text-cyan-400 font-bold text-lg">❄️</span> để ngưng đọng thời gian. Cẩn thận tránh bắn nhầm quả Bom <span class="text-red-500 font-bold text-lg">💣</span> (bị trừ 3 giây).</span>
+                    </li>
+                    <li class="flex items-start gap-3">
+                        <span class="text-lg md:text-2xl drop-shadow-md">🔥</span>
+                        <span><strong>Đặc biệt:</strong> Bắn trúng liên tiếp để kích hoạt <strong>Combo nhân đôi điểm số</strong>, nhưng lưu ý các mục tiêu sẽ bay nhanh và né tránh khó lường hơn!</span>
+                    </li>
+                </ul>
+            </div>
+
+            <button id="btn-start" class="btn-start font-scifi tracking-widest px-8 py-4 md:px-12 md:py-5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-full text-lg md:text-2xl transform transition hover:scale-105 active:scale-95 border border-cyan-400 mb-4">
+                INITIATE COMBAT
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="end-screen" class="screen hidden">
+        <div class="text-center p-8 bg-gray-900/90 rounded-3xl border border-gray-700 shadow-[0_0_50px_rgba(0,0,0,0.8)] backdrop-blur-xl max-w-md w-11/12 relative">
+            <h2 class="font-scifi text-4xl md:text-5xl font-black mb-2" id="end-title">MISSION END</h2>
+            <p class="text-gray-400 mb-6 text-base md:text-lg" id="end-message">Phân tích kết quả chiến đấu...</p>
+            
+            <div class="text-center bg-gray-800/80 p-5 rounded-2xl border border-gray-700 w-full mb-6">
+                <p class="font-scifi text-xs md:text-sm text-gray-400 uppercase tracking-widest mb-1">TỔNG ĐIỂM TÍCH LŨY</p>
+                <p class="font-scifi text-5xl md:text-6xl font-black text-[#00ff66] text-glow-green" id="final-score">0</p>
+            </div>
+
+            <div class="flex flex-col md:flex-row gap-3">
+                <button id="btn-review" class="font-scifi tracking-widest w-full md:w-1/2 px-4 py-3 bg-blue-900/60 hover:bg-blue-800/80 text-white font-bold rounded-xl text-sm transition border border-blue-500/50 shadow-[0_0_10px_rgba(0,243,255,0.2)]">
+                    XEM ĐÁP ÁN
+                </button>
+                <button id="btn-restart" class="font-scifi tracking-widest w-full md:w-1/2 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded-xl text-sm transition border border-gray-500">
+                    CHƠI LẠI
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pause Screen -->
+    <div id="pause-screen" class="screen hidden !bg-black/80">
+        <div class="text-center p-10 bg-gray-900/90 rounded-3xl border border-yellow-500/30 shadow-[0_0_50px_rgba(255,170,0,0.2)] backdrop-blur-xl">
+            <h2 class="font-scifi text-4xl md:text-5xl font-black mb-8 text-yellow-400 text-glow-orange tracking-widest">SYSTEM PAUSED</h2>
+            <button id="btn-resume" class="font-scifi tracking-widest px-10 py-4 bg-gradient-to-r from-yellow-600 to-orange-600 text-white font-bold rounded-full text-lg transition border border-yellow-400">
+                RESUME COMBAT
+            </button>
+        </div>
+    </div>
+
+    <!-- Review Screen -->
+    <div id="review-screen" class="screen hidden">
+        <div class="w-11/12 max-w-4xl h-[85vh] bg-gray-900/95 rounded-3xl border border-gray-600 shadow-[0_0_40px_rgba(0,243,255,0.2)] flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800/80">
+                <h2 class="font-scifi text-lg md:text-xl font-bold text-cyan-400 tracking-widest">BÁO CÁO NHIỆM VỤ</h2>
+                <button id="btn-close-review" class="w-10 h-10 bg-gray-700 hover:bg-red-600 rounded-full flex justify-center items-center transition text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="review-content" class="flex-1 overflow-y-auto p-4 space-y-4 hide-scrollbar">
+                <!-- Data injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- HUD (Heads Up Display) -->
+    <div id="hud" class="hud-hidden flex-col h-full w-full absolute inset-0 pointer-events-none z-20">
+        <!-- Top Tech Bar -->
+        <div class="glass-panel px-4 md:px-6 py-1.5 flex justify-between items-center pointer-events-auto shadow-md">
+            <div class="flex items-center gap-2 md:gap-4">
+                <div class="flex flex-col">
+                    <span class="font-scifi text-[8px] md:text-[10px] text-cyan-400 uppercase tracking-widest leading-none">WAVE</span>
+                    <div class="font-scifi text-lg md:text-xl lg:text-2xl font-bold text-white text-glow-blue leading-none mt-1" id="ui-question-num">1/5</div>
+                </div>
+                
+                <div class="flex gap-1 md:gap-2 ml-1 md:ml-3">
+                    <button id="btn-mute" class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-gray-800/80 hover:bg-gray-700 flex items-center justify-center border border-gray-600 transition" title="Bật/Tắt âm thanh">
+                        <svg id="icon-sound-on" class="w-4 h-4 md:w-5 md:h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5 10v4a2 2 0 002 2h2.286l3.293 3.293A1 1 0 0014 18.5V5.5a1 1 0 00-1.707-.707L9.286 8H7a2 2 0 00-2 2z"></path></svg>
+                        <svg id="icon-sound-off" class="w-4 h-4 md:w-5 md:h-5 text-red-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h2.586l-1.293-1.293a1 1 0 011.414-1.414l11 11a1 1 0 01-1.414 1.414L5.586 15zM12 5.5a1 1 0 011.707.707L12 7.914V5.5zM15.536 8.464a5 5 0 010 7.072"></path></svg>
+                    </button>
+                    <button id="btn-pause" class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-gray-800/80 hover:bg-gray-700 flex items-center justify-center border border-gray-600 transition" title="Tạm dừng">
+                        <svg class="w-4 h-4 md:w-5 md:h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex flex-col items-center">
+                <span class="font-scifi text-[8px] md:text-[10px] text-red-400 uppercase tracking-widest leading-none">SYSTEM TIME</span>
+                <span class="font-scifi text-2xl md:text-3xl lg:text-4xl font-black text-red-500 tabular-nums text-glow-red leading-none mt-1" id="ui-timer">60</span>
+            </div>
+
+            <div class="flex flex-col items-end">
+                <span class="font-scifi text-[8px] md:text-[10px] text-[#00ff66] uppercase tracking-widest leading-none">SCORE</span>
+                <span class="font-scifi text-2xl md:text-3xl lg:text-4xl font-black text-[#00ff66] text-glow-green leading-none mt-1" id="ui-score">0</span>
+            </div>
+        </div>
+
+        <!-- Question Area (Dynamic Height, Auto Scroll, Smooth Transition) -->
+        <div id="question-container" class="bg-gradient-to-b from-gray-900/95 to-gray-900/70 p-4 md:p-6 lg:p-8 border-b border-cyan-500/40 flex-shrink-0 z-10 pointer-events-auto shadow-[0_15px_30px_rgba(0,0,0,0.6)] h-auto max-h-[75vh] overflow-y-auto flex flex-col transition-all duration-300 ease-in-out">
+            <div class="max-w-6xl mx-auto w-full">
+                <h3 class="text-lg md:text-2xl lg:text-3xl font-bold text-center text-white drop-shadow-[0_2px_5px_rgba(0,0,0,0.9)] mb-4 md:mb-6 leading-relaxed" id="question-text">
+                    Đang thiết lập dữ liệu...
+                </h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4" id="options-container">
+                    <!-- Options injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Effect Layer -->
+    <div id="flash-effect" class="flash-overlay"></div>
+
+    <!-- Canvas Area -->
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    </div> <!-- Close app-wrapper -->
+
+    <script>
+        const questionBank = [
+            // --- NHÓM 1: NHẬN DIỆN BẤT PHƯƠNG TRÌNH BẬC NHẤT HAI ẨN (Bắt buộc ra ở Câu 1) ---
+            { type: "ID", q: "Trong các bất phương trình sau, đâu là bất phương trình bậc nhất hai ẩn?", options: [{id: "A", text: "$x^2 + 2y < 5$"}, {id: "B", text: "$3x - 4y \\ge 1$"}, {id: "C", text: "$2x - 0y^2 > 0$"}, {id: "D", text: "$x + y + z \\le 3$"}], correct: "B" },
+            { type: "ID", q: "Dạng tổng quát của một bất phương trình bậc nhất hai ẩn $x, y$ là biểu thức nào dưới đây?", options: [{id: "A", text: "$ax^2 + by \\le c$"}, {id: "B", text: "$ax + by = c$"}, {id: "C", text: "$ax + by < c$ ($a, b$ không đồng thời bằng $0$)"}, {id: "D", text: "$a\\sqrt{x} + by > c$"}], correct: "C" },
+            { type: "ID", q: "Bất phương trình nào sau đây KHÔNG phải là bất phương trình bậc nhất hai ẩn?", options: [{id: "A", text: "$0x + 3y > 5$"}, {id: "B", text: "$2x - 0y \\le 1$"}, {id: "C", text: "$\\frac{1}{2}x + \\frac{3}{4}y \\ge 0$"}, {id: "D", text: "$x^2 + y^2 \\le 4$"}], correct: "D" },
+            { type: "ID", q: "Biểu thức nào sau đây biểu diễn một bất phương trình bậc nhất hai ẩn?", options: [{id: "A", text: "$\\frac{2}{x} + 3y < 1$"}, {id: "B", text: "$-x + 4y > -2$"}, {id: "C", text: "$x - \\sqrt{y} \\ge 0$"}, {id: "D", text: "$0x + 0y \\le 5$"}], correct: "B" },
+            { type: "ID", q: "Trong các hệ thức sau, hệ thức nào là bất phương trình bậc nhất hai ẩn?", options: [{id: "A", text: "$2x + 3y^2 > 5$"}, {id: "B", text: "$x^2 - y < 0$"}, {id: "C", text: "$2x - 5y \\le 1$"}, {id: "D", text: "$x + y + 1 = 0$"}], correct: "C" },
+            
+            // --- NHÓM 2: KIỂM TRA NGHIỆM (Bắt buộc ra ở Câu 2) ---
+            { type: "SOL", q: "Cặp số $(x; y)$ nào sau đây là một nghiệm của bất phương trình $3x - y > 2$?", options: [{id: "A", text: "$(1; 2)$"}, {id: "B", text: "$(0; -1)$"}, {id: "C", text: "$(2; 1)$"}, {id: "D", text: "$(-1; -5)$"}], correct: "C" },
+            { type: "SOL", q: "Cặp số $(1; -1)$ là nghiệm của bất phương trình nào dưới đây?", options: [{id: "A", text: "$x + y - 3 > 0$"}, {id: "B", text: "$-x - y < 0$"}, {id: "C", text: "$x + 3y + 1 < 0$"}, {id: "D", text: "$-x - 3y - 1 < 0$"}], correct: "C" },
+            { type: "SOL", q: "Cặp số $(x; y)$ nào sau đây KHÔNG phải là nghiệm của bất phương trình $2x + y \\le 5$?", options: [{id: "A", text: "$(1; 1)$"}, {id: "B", text: "$(2; 1)$"}, {id: "C", text: "$(0; 5)$"}, {id: "D", text: "$(3; 0)$"}], correct: "D" },
+            { type: "SOL", q: "Điểm $M(0; -2)$ thuộc miền nghiệm của bất phương trình nào sau đây?", options: [{id: "A", text: "$3x - y > 5$"}, {id: "B", text: "$x + 2y \\le -4$"}, {id: "C", text: "$2x + y < -2$"}, {id: "D", text: "$x - y \\ge 3$"}], correct: "B" },
+            { type: "SOL", q: "Cho bất phương trình $x - 2y \\ge 4$. Khẳng định nào sau đây là đúng?", options: [{id: "A", text: "Cặp số $(0; 0)$ là một nghiệm"}, {id: "B", text: "Cặp số $(5; 1)$ KHÔNG phải là nghiệm"}, {id: "C", text: "Cặp số $(4; 0)$ là một nghiệm"}, {id: "D", text: "Cặp số $(2; -1)$ KHÔNG phải là nghiệm"}], correct: "C" },
+            { type: "SOL", q: "Trong các điểm sau, điểm nào KHÔNG thuộc miền nghiệm của bất phương trình $-2x + y \\ge -1$?", options: [{id: "A", text: "$P(0; -1)$"}, {id: "B", text: "$Q(1; 1)$"}, {id: "C", text: "$R(-1; 0)$"}, {id: "D", text: "$S(2; 0)$"}], correct: "D" },
+            
+            // --- NHÓM 3: BÀI TOÁN THỰC TẾ (Bắt buộc ra ở Câu 3) ---
+            { type: "REAL", q: "Một bạn học sinh đem theo 50 nghìn đồng vào nhà sách để mua $x$ cây bút (giá 4 nghìn đồng/cây) và $y$ quyển vở (giá 8 nghìn đồng/quyển). Bất phương trình mô tả điều kiện để số tiền mua đồ không vượt quá số tiền mang theo là:", options: [{id: "A", text: "$4x + 8y > 50$"}, {id: "B", text: "$4x + 8y \\le 50$"}, {id: "C", text: "$4x + 8y \\ge 50$"}, {id: "D", text: "$4x + 8y < 50$"}], correct: "B" },
+            { type: "REAL", q: "Một xưởng cơ khí cần sản xuất hai loại sản phẩm A và B. Để gia công một sản phẩm loại A cần 2 giờ, một sản phẩm loại B cần 3 giờ. Trong một tuần, xưởng có tối đa 120 giờ làm việc. Gọi $x, y$ lần lượt là số lượng sản phẩm loại A và loại B được sản xuất. Bất phương trình thể hiện giới hạn về thời gian làm việc của xưởng là:", options: [{id: "A", text: "$2x + 3y \\ge 120$"}, {id: "B", text: "$2x + 3y \\le 120$"}, {id: "C", text: "$3x + 2y \\le 120$"}, {id: "D", text: "$2x + 3y = 120$"}], correct: "B" },
+            { type: "REAL", q: "Một gia đình dự định thuê $x$ chiếc xe loại nhỏ (giá thuê 300 nghìn đồng/chiếc) và $y$ chiếc xe loại lớn (giá thuê 500 nghìn đồng/chiếc) để chuyển đồ. Biết rằng tổng chi phí thuê xe không được vượt quá 2 triệu đồng (tương đương 2000 nghìn đồng). Bất phương trình mô tả điều kiện về chi phí thuê xe là:", options: [{id: "A", text: "$300x + 500y < 2000$"}, {id: "B", text: "$300x + 500y \\le 2000$"}, {id: "C", text: "$500x + 300y \\ge 2000$"}, {id: "D", text: "$300x + 500y > 2000$"}], correct: "B" },
+            { type: "REAL", q: "Trong một bài kiểm tra, mỗi câu trắc nghiệm trả lời đúng được 0.2 điểm, mỗi câu tự luận trả lời đúng được 1 điểm. Một học sinh đặt mục tiêu đạt tổng điểm từ 8 điểm trở lên. Gọi $x, y$ lần lượt là số câu trắc nghiệm và số câu tự luận mà học sinh đó trả lời đúng. Bất phương trình thể hiện mục tiêu điểm số của học sinh đó là:", options: [{id: "A", text: "$0.2x + y < 8$"}, {id: "B", text: "$0.2x + y \\le 8$"}, {id: "C", text: "$0.2x + y > 8$"}, {id: "D", text: "$0.2x + y \\ge 8$"}], correct: "D" },
+            { type: "REAL", q: "Tại một rạp chiếu phim, giá vé cho người lớn là 100 nghìn đồng/vé và vé cho trẻ em là 60 nghìn đồng/vé. Trong một suất chiếu, rạp chiếu phim đặt mục tiêu doanh thu bán vé phải đạt ít nhất 10 triệu đồng (tương đương 10000 nghìn đồng). Gọi $x, y$ lần lượt là số lượng vé người lớn và vé trẻ em bán được. Bất phương trình thể hiện điều kiện về doanh thu là:", options: [{id: "A", text: "$100x + 60y \\ge 10000$"}, {id: "B", text: "$100x + 60y \\le 10000$"}, {id: "C", text: "$100x + 60y = 10000$"}, {id: "D", text: "$60x + 100y \\ge 10000$"}], correct: "A" },
+
+            // --- NHÓM 4: LÝ THUYẾT & TÌM THAM SỐ (Câu 4, 5 bốc ngẫu nhiên) ---
+            { type: "OTHER", q: "Với giá trị nào của tham số $m$ thì bất phương trình $(m - 2)x + 5y > 3$ là bất phương trình bậc nhất hai ẩn?", options: [{id: "A", text: "$m = 2$"}, {id: "B", text: "$m \\ne 2$"}, {id: "C", text: "$m = 0$"}, {id: "D", text: "Mọi $m \\in \\mathbb{R}$"}], correct: "B" },
+            { type: "OTHER", q: "Khái niệm 'nghiệm của bất phương trình $ax + by \\le c$' mang ý nghĩa nào sau đây?", options: [{id: "A", text: "Là một giá trị $x$ duy nhất thỏa mãn bất phương trình"}, {id: "B", text: "Là cặp số $(x_0; y_0)$ sao cho mệnh đề $ax_0 + by_0 \\le c$ là đúng"}, {id: "C", text: "Là một giá trị $y$ duy nhất thỏa mãn bất phương trình"}, {id: "D", text: "Là tập hợp tất cả các số thực"}], correct: "B" },
+            { type: "OTHER", q: "Với điều kiện nào của tham số $m$ thì biểu thức $mx + (m - 1)y \\ge 2$ KHÔNG PHẢI là bất phương trình bậc nhất hai ẩn?", options: [{id: "A", text: "$m = 0$"}, {id: "B", text: "$m = 1$"}, {id: "C", text: "Không có giá trị nào của tham số $m$"}, {id: "D", text: "$m = 0$ hoặc $m = 1$"}], correct: "C" },
+            { type: "OTHER", q: "Cho bất phương trình $(m^2 + 1)x - 3y < 5$. Khẳng định nào sau đây là ĐÚNG?", options: [{id: "A", text: "Luôn là bất phương trình bậc nhất hai ẩn với mọi $m$"}, {id: "B", text: "Chỉ là bất phương trình bậc nhất hai ẩn khi $m \\ne 0$"}, {id: "C", text: "Không bao giờ là bất phương trình bậc nhất hai ẩn"}, {id: "D", text: "Là bất phương trình bậc nhất hai ẩn khi $m \\ne -1$"}], correct: "A" },
+            { type: "OTHER", q: "Khẳng định nào sau đây là ĐÚNG khi nói về miền nghiệm của bất phương trình $ax + by > c$?", options: [{id: "A", text: "Không bao gồm các điểm nằm trên đường thẳng $d: ax + by = c$"}, {id: "B", text: "Chỉ bao gồm đường thẳng bờ $d: ax + by = c$"}, {id: "C", text: "Bao gồm cả nửa mặt phẳng và đường thẳng bờ $d$"}, {id: "D", text: "Chính là đường thẳng $ax + by = c$"}], correct: "A" },
+            { type: "OTHER", q: "Miền nghiệm của bất phương trình $2x - y < 3$ là nửa mặt phẳng có tính chất nào dưới đây?", options: [{id: "A", text: "Chứa gốc tọa độ $O(0;0)$"}, {id: "B", text: "Không chứa gốc tọa độ $O(0;0)$"}, {id: "C", text: "Có chứa điểm $A(2; -1)$"}, {id: "D", text: "Không chứa điểm $B(1; 1)$"}], correct: "A" },
+            { type: "OTHER", q: "Miền nghiệm của bất phương trình $x + y \\ge 2$ là phần mặt phẳng có chứa điểm nào trong các điểm sau đây?", options: [{id: "A", text: "$M(0; 0)$"}, {id: "B", text: "$N(1; 0)$"}, {id: "C", text: "$P(2; 1)$"}, {id: "D", text: "$Q(0; 1)$"}], correct: "C" },
+            { type: "OTHER", q: "Cặp số nào sau đây thuộc miền nghiệm của bất phương trình $-x + 2y < 0$?", options: [{id: "A", text: "$(0; 1)$"}, {id: "B", text: "$(-2; 0)$"}, {id: "C", text: "$(1; 1)$"}, {id: "D", text: "$(2; -1)$"}], correct: "D" },
+            { type: "OTHER", q: "Cho bất phương trình $x \\ge 0$. Khẳng định nào đúng về miền nghiệm của nó?", options: [{id: "A", text: "Là nửa mặt phẳng bên trái trục tung"}, {id: "B", text: "Là nửa mặt phẳng bên phải trục tung (bao gồm cả trục tung)"}, {id: "C", text: "Là nửa mặt phẳng phía trên trục hoành"}, {id: "D", text: "Là toàn bộ góc phần tư thứ nhất của hệ tọa độ"}], correct: "B" }
+        ];
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('game-container');
+
+        const screens = {
+            start: document.getElementById('start-screen'),
+            end: document.getElementById('end-screen'),
+            hud: document.getElementById('hud'),
+            pause: document.getElementById('pause-screen'),
+            review: document.getElementById('review-screen')
+        };
+        const els = {
+            qNum: document.getElementById('ui-question-num'),
+            timer: document.getElementById('ui-timer'),
+            score: document.getElementById('ui-score'),
+            qText: document.getElementById('question-text'),
+            optContainer: document.getElementById('options-container'),
+            flash: document.getElementById('flash-effect'),
+            endTitle: document.getElementById('end-title'),
+            endMsg: document.getElementById('end-message'),
+            finalScore: document.getElementById('final-score'),
+            qContainer: document.getElementById('question-container'),
+            reviewContent: document.getElementById('review-content')
+        };
+
+        let gameState = 'START';
+        let currentQuestions = [];
+        let currentQIndex = 0;
+        let score = 0;
+        let timeLeft = 60;
+        let timerInterval = null;
+        let animationFrameId = null;
+        
+        let consecutiveCorrect = 0;
+        let isTransitioning = false;
+        let isMuted = false;
+        let isPaused = false;
+        let freezeTimer = 0;
+        let gameHistory = []; 
+
+        const mouse = { x: 0, y: 0 };
+        const gun = { x: 0, y: 0, angle: 0 };
+        
+        let targets = [];
+        let particles = [];
+        let lasers = [];
+        let floatingTexts = [];
+        let stars = [];
+        let powerUps = [];
+        let bombs = [];
+        
+        let gunRecoil = 0; 
+        let cameraShake = 0;
+
+        let synth, drumSynth;
+        let audioInitialized = false;
+
+        function initAudio() {
+            if (audioInitialized) return;
+            try {
+                if (typeof Tone !== 'undefined' && Tone.context) {
+                    if (Tone.context.state !== 'running') {
+                        Tone.start(); // Async implicitly handled
+                    }
+                    synth = new Tone.PolySynth(Tone.FMSynth, {
+                        modulationIndex: 12.22,
+                        envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 },
+                        modulation: { type: "square" },
+                        modulationEnvelope: { attack: 0.2, decay: 0.01, sustain: 1, release: 0.01 }
+                    }).toDestination();
+                    
+                    drumSynth = new Tone.MembraneSynth({
+                        pitchDecay: 0.05,
+                        octaves: 10,
+                        oscillator: { type: "square" },
+                        envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 1.4 }
+                    }).toDestination();
+
+                    synth.volume.value = isMuted ? -Infinity : -12;
+                    drumSynth.volume.value = isMuted ? -Infinity : -14;
+
+                    audioInitialized = true;
+                }
+            } catch(e) { console.warn("Audio init warning:", e); }
+        }
+        
+        document.getElementById('btn-mute').addEventListener('click', () => {
+            isMuted = !isMuted;
+            if (synth) synth.volume.value = isMuted ? -Infinity : -12;
+            if (drumSynth) drumSynth.volume.value = isMuted ? -Infinity : -14;
+            document.getElementById('icon-sound-on').classList.toggle('hidden', isMuted);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', !isMuted);
+        });
+
+        function playSound(type) {
+            if (!audioInitialized || !synth || !drumSynth || !Tone.context) return;
+            try {
+                const now = Tone.now();
+                if (type === 'miss') synth.triggerAttackRelease("A5", "32n", now);
+                else if (type === 'hit') drumSynth.triggerAttackRelease("C2", "8n", now);
+                else if (type === 'correct') synth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "8n", now + 0.15);
+                else if (type === 'wrong') synth.triggerAttackRelease(["C2", "Eb2"], "4n", now + 0.15);
+                else if (type === 'powerup') synth.triggerAttackRelease(["E5", "A5", "C6"], "8n", now);
+                else if (type === 'bomb') drumSynth.triggerAttackRelease("C1", "4n", now);
+            } catch (e) { /* Ignore strict context errors */ }
+        }
+
+        function resizeCanvas() {
+            // Robust resizing that avoids 0x0 crashes
+            const rect = gameContainer.getBoundingClientRect();
+            canvas.width = Math.max(100, rect.width);
+            canvas.height = Math.max(100, rect.height);
+            gun.x = canvas.width / 2;
+            gun.y = canvas.height - 40;
+            initStars();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 150; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2,
+                    speed: (Math.random() * 0.5) + 0.1,
+                    alpha: Math.random()
+                });
+            }
+        }
+
+        class Target {
+            constructor(id) {
+                this.id = id;
+                this.radius = Math.max(25, Math.min(canvas.width, canvas.height) * 0.055); 
+                
+                this.x = this.radius + 15 + Math.random() * (canvas.width - this.radius * 2 - 30);
+                
+                // Safe HUD bottom calculation
+                let hBottom = 150; 
+                if(els.qContainer) hBottom = els.qContainer.offsetTop + els.qContainer.offsetHeight;
+                
+                // Start exactly below HUD
+                this.y = hBottom + this.radius + 10 + Math.random() * 40;
+                
+                // ĐÃ TĂNG TỐC ĐỘ BAN ĐẦU
+                const speed = 1.8 + Math.random() * 2.0;
+                const moveAngle = Math.random() * Math.PI; // Fly downwards initially
+                this.vx = Math.cos(moveAngle) * speed;
+                this.vy = Math.sin(moveAngle) * speed;
+                
+                this.spinAngle = 0;
+                this.turnRate = 0; // Thuộc tính mới: Lưu lực bẻ lái mượt mà
+                this.trail = []; 
+                const colors = { 'A': '#ff003c', 'B': '#00f3ff', 'C': '#00ff66', 'D': '#ffaa00' };
+                this.color = colors[this.id];
+            }
+
+            update() {
+                // ĐÃ TĂNG TỐC ĐỘ TỐI ĐA
+                const maxSpeed = 4.0 + (consecutiveCorrect * 0.3);
+                let currentSpeed = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+                
+                // Kích tốc: Đảm bảo drone không bao giờ bay quá chậm
+                if (currentSpeed < 2.0) currentSpeed += 0.05;
+
+                // THUẬT TOÁN BAY MƯỢT (SMOOTH CURVING)
+                // 5% cơ hội tạo ra một lực lượn mới mỗi khung hình
+                if (Math.random() < 0.05) {
+                    this.turnRate = (Math.random() - 0.5) * 0.15; // Giới hạn độ gắt của vòng cua
+                }
+                
+                // Liên tục áp dụng góc lượn (turnRate) vào hướng bay hiện tại
+                const currentAngle = Math.atan2(this.vy, this.vx);
+                const newAngle = currentAngle + this.turnRate;
+                
+                // Cập nhật lại vector vận tốc
+                this.vx = Math.cos(newAngle) * currentSpeed;
+                this.vy = Math.sin(newAngle) * currentSpeed;
+
+                // Khống chế tốc độ trần
+                if(currentSpeed > maxSpeed && currentSpeed > 0.1) {
+                    this.vx = (this.vx / currentSpeed) * maxSpeed;
+                    this.vy = (this.vy / currentSpeed) * maxSpeed;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.spinAngle += 0.03; 
+                
+                // SECURE BOUNDARY CHECK TO PREVENT NaN VELOCITY LOOP CRASH
+                let hBottom = 150; 
+                if(els.qContainer && els.qContainer.offsetHeight > 0) {
+                    hBottom = els.qContainer.offsetTop + els.qContainer.offsetHeight;
+                }
+
+                const minX = this.radius + 10;
+                const maxX = Math.max(minX, canvas.width - this.radius - 10);
+                const minY = hBottom + this.radius + 5;
+                
+                // MỞ RỘNG KHÔNG PHẬN: Cho phép Drone bay xuống sát tháp pháo
+                const maxY = Math.max(minY + 10, canvas.height - this.radius - 100);
+                
+                // Đảo chiều mượt mà khi chạm tường & reset góc lượn
+                if (this.x < minX) { this.x = minX; this.vx = Math.abs(this.vx); this.turnRate = 0; }
+                else if (this.x > maxX) { this.x = maxX; this.vx = -Math.abs(this.vx); this.turnRate = 0; }
+
+                if (this.y < minY) { this.y = minY; this.vy = Math.abs(this.vy); this.turnRate = 0; }
+                else if (this.y > maxY) { this.y = maxY; this.vy = -Math.abs(this.vy); this.turnRate = 0; }
+
+                this.trail.push({x: this.x, y: this.y});
+                if(this.trail.length > 8) this.trail.shift();
+            }
+
+            draw(ctx) {
+                // Trail
+                if (this.trail.length > 1) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(this.trail[0].x, this.trail[0].y);
+                    for(let i=1; i<this.trail.length; i++) ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                    ctx.lineWidth = this.radius * 0.8;
+                    ctx.lineCap = 'round';
+                    ctx.strokeStyle = this.color;
+                    ctx.globalAlpha = 0.15;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = this.color;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = this.color;
+
+                // Drone Body (Hexagon)
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = (Math.PI / 3) * i + this.spinAngle;
+                    const hx = Math.cos(a) * (this.radius * 0.85);
+                    const hy = Math.sin(a) * (this.radius * 0.85);
+                    if (i === 0) ctx.moveTo(hx, hy);
+                    else ctx.lineTo(hx, hy);
+                }
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(10, 15, 30, 0.95)';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = this.color;
+                ctx.stroke();
+
+                // Outer rotating ring
+                ctx.rotate(-this.spinAngle * 1.5);
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.setLineDash([6, 12]);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = this.color;
+                ctx.stroke();
+                ctx.setLineDash([]); 
+                
+                // Label
+                ctx.rotate(this.spinAngle * 1.5); 
+                ctx.shadowBlur = 6; 
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `900 ${this.radius * 1.3}px Orbitron, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.id, 0, 2); 
+                
+                ctx.restore();
+            }
+        }
+
+        class PowerUp {
+            constructor() {
+                this.radius = Math.max(22, Math.min(canvas.width, canvas.height) * 0.045); 
+                this.x = this.radius + Math.random() * (canvas.width - this.radius * 2);
+                const hudBottom = (els.qContainer && els.qContainer.offsetHeight > 0) ? (els.qContainer.offsetTop + els.qContainer.offsetHeight) : 150;
+                this.y = hudBottom + this.radius;
+                this.vy = 1.0 + Math.random();
+                this.type = 'FREEZE';
+                this.color = '#00f3ff';
+                this.spin = 0;
+                this.life = 1;
+            }
+            update() {
+                this.y += this.vy;
+                this.spin += 0.05;
+                if(this.y > canvas.height + 50) this.life = 0;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.spin);
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.rect(-this.radius, -this.radius, this.radius*2, this.radius*2);
+                ctx.fillStyle = 'rgba(10, 15, 30, 0.9)';
+                ctx.fill();
+                ctx.stroke();
+                ctx.rotate(-this.spin);
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = this.color;
+                ctx.font = `bold ${this.radius * 1.2}px Inter`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('❄️', 0, 0);
+                ctx.restore();
+            }
+        }
+
+        class Bomb {
+            constructor() {
+                this.radius = Math.max(22, Math.min(canvas.width, canvas.height) * 0.045); 
+                this.x = this.radius + Math.random() * (canvas.width - this.radius * 2);
+                const hudBottom = (els.qContainer && els.qContainer.offsetHeight > 0) ? (els.qContainer.offsetTop + els.qContainer.offsetHeight) : 150;
+                this.y = hudBottom + this.radius;
+                this.vy = 1.5 + Math.random() * 1.5;
+                this.color = '#ff003c';
+                this.pulse = 0;
+                this.life = 1;
+            }
+            update() {
+                this.y += this.vy;
+                this.pulse += 0.1;
+                if(this.y > canvas.height + 50) this.life = 0;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(Math.sin(this.pulse) * 0.2); 
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI*2);
+                ctx.fillStyle = 'rgba(30, 0, 5, 0.95)';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = this.color;
+                ctx.stroke();
+                ctx.save();
+                ctx.rotate(this.pulse * 0.5);
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius + 6, 0, Math.PI*2);
+                ctx.setLineDash([8, 6]);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255, 0, 60, 0.6)';
+                ctx.stroke();
+                ctx.restore();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `${this.radius * 1.3}px Inter, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('💣', 0, 2);
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 8 + 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.04 + 0.02;
+                this.color = color;
+                this.size = Math.random() * 5 + 2;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                this.life -= this.decay;
+                this.size *= 0.95;
+            }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class FloatingText {
+            constructor(x, y, text, color) {
+                this.x = x; this.y = y;
+                this.text = text;
+                this.color = color;
+                this.life = 1.0;
+                this.vy = -1.5;
+            }
+            update() { this.y += this.vy; this.life -= 0.02; }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                ctx.font = '900 24px Orbitron, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        class Laser {
+            constructor(startX, startY, endX, endY, isHit) {
+                this.startX = startX; this.startY = startY;
+                this.endX = endX; this.endY = endY;
+                this.life = 1.0;
+                this.isHit = isHit;
+                this.color = isHit ? '#00ff66' : '#00f3ff';
+            }
+            update() { this.life -= 0.15; }
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.beginPath();
+                ctx.moveTo(this.startX, this.startY);
+                ctx.lineTo(this.endX, this.endY);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(this.startX, this.startY);
+                ctx.lineTo(this.endX, this.endY);
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = this.color;
+                ctx.globalAlpha = Math.max(0, this.life * 0.5);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        function buildQuestionSet() {
+            const qID = questionBank.filter(q => q.type === "ID");
+            const qSOL = questionBank.filter(q => q.type === "SOL");
+            const qREAL = questionBank.filter(q => q.type === "REAL");
+            
+            const q1 = qID[Math.floor(Math.random() * qID.length)];
+            const q2 = qSOL[Math.floor(Math.random() * qSOL.length)];
+            const q3 = qREAL[Math.floor(Math.random() * qREAL.length)];
+            
+            let remainingQuestions = questionBank.filter(q => q !== q1 && q !== q2 && q !== q3);
+            remainingQuestions = shuffleArray(remainingQuestions);
+            
+            return [q1, q2, q3, remainingQuestions[0], remainingQuestions[1]];
+        }
+
+        function spawnExplosion(x, y, color) {
+            for(let i=0; i<25; i++) particles.push(new Particle(x, y, color));
+        }
+
+        function triggerFlash(type = 'white') {
+            els.flash.className = 'flash-overlay'; 
+            if (type === 'green') els.flash.classList.add('flash-green');
+            else if (type === 'red') els.flash.classList.add('flash-red');
+            else els.flash.classList.add('flash-white');
+            void els.flash.offsetHeight; // Reflow to reset animation
+            els.flash.classList.add('flash-active');
+        }
+
+        function renderMathForUI() {
+            if (window.renderMathInElement) {
+                try {
+                    renderMathInElement(document.getElementById('hud'), {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false}
+                        ],
+                        throwOnError: false
+                    });
+                } catch(e) { console.warn("KaTeX render error", e); }
+            }
+        }
+
+        function startRound() {
+            if(currentQIndex >= 5 || timeLeft <= 0) {
+                endGame();
+                return;
+            }
+            
+            isTransitioning = false;
+            const q = currentQuestions[currentQIndex];
+            els.qNum.innerText = `${currentQIndex + 1}/5`;
+            els.qText.innerHTML = q.q; 
+            
+            els.optContainer.innerHTML = '';
+            q.options.forEach(opt => {
+                const div = document.createElement('div');
+                div.className = "option-box p-3 md:p-4 rounded-xl flex items-center gap-3 md:gap-4";
+                div.id = `opt-${opt.id}`;
+                div.innerHTML = `
+                    <div class="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 rounded-lg bg-gray-900/90 flex items-center justify-center font-scifi font-bold text-base md:text-xl text-cyan-400 border border-cyan-500/50 shadow-[0_0_10px_rgba(0,243,255,0.2)]">${opt.id}</div>
+                    <div class="text-sm md:text-lg lg:text-xl font-semibold flex-1 text-gray-100 drop-shadow-md">${opt.text}</div>
+                `;
+                els.optContainer.appendChild(div);
+            });
+
+            setTimeout(renderMathForUI, 10);
+            targets = [new Target('A'), new Target('B'), new Target('C'), new Target('D')];
+        }
+
+        function processShot(hitTarget) {
+            isTransitioning = true;
+            const q = currentQuestions[currentQIndex];
+            const isCorrect = (hitTarget.id === q.correct);
+            
+            gameHistory.push({
+                question: q,
+                userAns: hitTarget.id,
+                isCorrect: isCorrect
+            });
+            
+            if (isCorrect) {
+                playSound('correct');
+                triggerFlash('green');
+                consecutiveCorrect++;
+                
+                let pointsEarned = 1;
+                let textStr = "+1 ĐIỂM";
+                if(consecutiveCorrect >= 2) {
+                    pointsEarned = 2;
+                    textStr = "COMBO x" + consecutiveCorrect;
+                }
+                score += pointsEarned;
+                els.score.innerText = score;
+                
+                spawnExplosion(hitTarget.x, hitTarget.y, '#00ff66');
+                floatingTexts.push(new FloatingText(hitTarget.x, hitTarget.y - 20, textStr, '#00ff66'));
+                targets = targets.filter(t => t !== hitTarget);
+                
+                setTimeout(() => {
+                    currentQIndex++;
+                    startRound();
+                }, 800);
+            } else {
+                playSound('wrong');
+                triggerFlash('red');
+                consecutiveCorrect = 0; 
+                cameraShake = 20; 
+                
+                spawnExplosion(hitTarget.x, hitTarget.y, '#ff003c');
+                floatingTexts.push(new FloatingText(hitTarget.x, hitTarget.y - 20, "SAI LẦM!", '#ff003c'));
+                targets = targets.filter(t => t !== hitTarget);
+                
+                const correctEl = document.getElementById(`opt-${q.correct}`);
+                if (correctEl) correctEl.classList.add('option-correct-highlight');
+                
+                setTimeout(() => {
+                    currentQIndex++;
+                    startRound();
+                }, 1500);
+            }
+        }
+
+        function updateMouseCoords(evt) {
+            if(isPaused || gameState !== 'PLAYING') return;
+            let clientX, clientY;
+            if (evt.touches && evt.touches.length > 0) {
+                clientX = evt.touches[0].clientX;
+                clientY = evt.touches[0].clientY;
+            } else if (evt.clientX !== undefined) {
+                clientX = evt.clientX;
+                clientY = evt.clientY;
+            } else { return; }
+
+            const rect = canvas.getBoundingClientRect();
+            // Handle scale differences
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            mouse.x = (clientX - rect.left) * scaleX;
+            mouse.y = (clientY - rect.top) * scaleY;
+        }
+
+        function handleInteraction(evt) {
+            // Safely ignore clicks on valid UI buttons
+            if (evt.target && evt.target.closest) {
+                if (evt.target.closest('button')) return; 
+            }
+            if (gameState !== 'PLAYING' || isTransitioning || isPaused) return;
+            
+            // Prevent default touch behaviors (like scrolling)
+            if (evt.cancelable && evt.type.startsWith('touch')) evt.preventDefault();
+            
+            updateMouseCoords(evt);
+
+            if (evt.type === 'mousedown' || (evt.type === 'touchstart' && evt.touches.length === 1)) {
+                initAudio();
+                gunRecoil = 15; 
+                let hitTarget = null;
+                let hitPowerUp = null;
+                let hitBomb = null;
+
+                for (let i = powerUps.length - 1; i >= 0; i--) {
+                    const p = powerUps[i];
+                    const dx = mouse.x - p.x;
+                    const dy = mouse.y - p.y;
+                    if (Math.sqrt(dx*dx + dy*dy) <= p.radius + 15) { hitPowerUp = p; break; }
+                }
+
+                if(!hitPowerUp) {
+                    for (let i = bombs.length - 1; i >= 0; i--) {
+                        const b = bombs[i];
+                        const dx = mouse.x - b.x;
+                        const dy = mouse.y - b.y;
+                        if (Math.sqrt(dx*dx + dy*dy) <= b.radius + 15) { hitBomb = b; break; }
+                    }
+                }
+
+                if(!hitPowerUp && !hitBomb) {
+                    for (let i = targets.length - 1; i >= 0; i--) {
+                        const t = targets[i];
+                        const dx = mouse.x - t.x;
+                        const dy = mouse.y - t.y;
+                        if (Math.sqrt(dx*dx + dy*dy) <= t.radius + 10) { hitTarget = t; break; }
+                    }
+                }
+
+                const isHitAnything = hitTarget || hitPowerUp || hitBomb;
+
+                if (hitTarget) {
+                    playSound('hit');
+                    processShot(hitTarget);
+                } else if (hitPowerUp) {
+                    playSound('powerup');
+                    hitPowerUp.life = 0;
+                    spawnExplosion(hitPowerUp.x, hitPowerUp.y, hitPowerUp.color);
+                    freezeTimer = 3;
+                    floatingTexts.push(new FloatingText(hitPowerUp.x, hitPowerUp.y, "TIME FREEZE!", '#00f3ff'));
+                    screens.hud.classList.add('bg-freeze');
+                    setTimeout(() => screens.hud.classList.remove('bg-freeze'), 3000);
+                } else if (hitBomb) {
+                    playSound('bomb');
+                    hitBomb.life = 0;
+                    spawnExplosion(hitBomb.x, hitBomb.y, '#ff003c');
+                    floatingTexts.push(new FloatingText(hitBomb.x, hitBomb.y, "-3 GIÂY", '#ff003c'));
+                    cameraShake = 25; 
+                    consecutiveCorrect = 0; 
+                    timeLeft = Math.max(0, timeLeft - 3); 
+                    els.timer.innerText = timeLeft;
+                    triggerFlash('red');
+                } else {
+                    playSound('miss');
+                }
+
+                // Render Dual Cannons
+                if(!isNaN(gun.x) && !isNaN(gun.y)) {
+                    const gunOffsetX = Math.cos(gun.angle) * 12;
+                    const gunOffsetY = Math.sin(gun.angle) * 12;
+                    lasers.push(new Laser(gun.x + gunOffsetX, gun.y + gunOffsetY, mouse.x, mouse.y, !!isHitAnything));
+                    lasers.push(new Laser(gun.x - gunOffsetX, gun.y - gunOffsetY, mouse.x, mouse.y, !!isHitAnything));
+                }
+                triggerFlash('white');
+            }
+        }
+
+        function resolveDroneCollisions() {
+            for (let i = 0; i < targets.length; i++) {
+                for (let j = i + 1; j < targets.length; j++) {
+                    let t1 = targets[i];
+                    let t2 = targets[j];
+                    let dx = t2.x - t1.x;
+                    let dy = t2.y - t1.y;
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    let minDist = t1.radius + t2.radius; 
+
+                    if (dist < minDist && dist > 0) {
+                        let nx = dx / dist;
+                        let ny = dy / dist;
+                        // Lực đẩy cực kỳ êm (0.003) 
+                        // Đảm bảo chúng hoàn toàn lướt qua mặt nhau mà không bị khựng lại
+                        let repulsionForce = (minDist - dist) * 0.003; 
+                        t1.vx -= nx * repulsionForce;
+                        t1.vy -= ny * repulsionForce;
+                        t2.vx += nx * repulsionForce;
+                        t2.vy += ny * repulsionForce;
+                    }
+                }
+            }
+        }
+
+        function gameLoop() {
+            if (gameState !== 'PLAYING') return;
+            if (isPaused) {
+                animationFrameId = requestAnimationFrame(gameLoop);
+                return;
+            }
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            if (cameraShake > 0.5) {
+                const shakeX = (Math.random() - 0.5) * cameraShake;
+                const shakeY = (Math.random() - 0.5) * cameraShake;
+                ctx.translate(shakeX, shakeY);
+                cameraShake *= 0.85; 
+            }
+
+            // Grid Background
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.05)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            const gridSize = 50;
+            const gridOffset = (Date.now() / 30) % gridSize;
+            for(let x = 0; x < canvas.width; x += gridSize) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+            }
+            for(let y = 0; y < canvas.height + gridSize; y += gridSize) {
+                ctx.moveTo(0, y + gridOffset); ctx.lineTo(canvas.width, y + gridOffset);
+            }
+            ctx.stroke();
+
+            // Stars
+            ctx.fillStyle = '#ffffff';
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > canvas.height) { star.y = 0; star.x = Math.random() * canvas.width; }
+                ctx.globalAlpha = star.alpha;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI*2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            if(Math.random() < 0.003 && !isTransitioning) powerUps.push(new PowerUp());
+            if(Math.random() < 0.008 && !isTransitioning) bombs.push(new Bomb());
+
+            powerUps.forEach(p => p.update());
+            powerUps = powerUps.filter(p => p.life > 0);
+            powerUps.forEach(p => p.draw(ctx));
+
+            bombs.forEach(b => b.update());
+            bombs = bombs.filter(b => b.life > 0);
+            bombs.forEach(b => b.draw(ctx));
+
+            targets.forEach(t => t.update());
+            resolveDroneCollisions(); 
+            targets.forEach(t => t.draw(ctx));
+            
+            for(let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i]; p.update(); p.draw(ctx);
+                if(p.life <= 0) particles.splice(i, 1);
+            }
+            
+            for(let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i]; ft.update(); ft.draw(ctx);
+                if(ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            for(let i = lasers.length - 1; i >= 0; i--) {
+                const l = lasers[i]; l.update(); l.draw(ctx);
+                if(l.life <= 0) lasers.splice(i, 1);
+            }
+
+            gunRecoil *= 0.8;
+
+            // Render Player Turret
+            if(!isNaN(gun.x) && !isNaN(gun.y)) {
+                ctx.save();
+                ctx.translate(gun.x, gun.y);
+                const dx = mouse.x - gun.x;
+                const dy = mouse.y - gun.y;
+                gun.angle = Math.atan2(dy, dx) + Math.PI/2;
+                ctx.rotate(gun.angle);
+                
+                // Dash target line
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, -Math.sqrt(dx*dx + dy*dy));
+                ctx.setLineDash([5, 15]);
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(0, 243, 255, 0.2)';
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#00f3ff';
+                
+                // Dual Barrels
+                ctx.fillStyle = '#475569';
+                ctx.fillRect(-14, -50 + gunRecoil, 6, 30); 
+                ctx.fillRect(8, -50 + gunRecoil, 6, 30);  
+                
+                // Base
+                ctx.beginPath();
+                ctx.moveTo(0, -30); 
+                ctx.lineTo(20, 10); 
+                ctx.lineTo(10, 20); 
+                ctx.lineTo(-10, 20); 
+                ctx.lineTo(-20, 10); 
+                ctx.closePath();
+                ctx.fillStyle = '#0f172a'; 
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#00f3ff'; 
+                ctx.stroke();
+
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.ellipse(0, -5, 6, 12, 0, 0, Math.PI * 2);
+                ctx.fillStyle = '#00f3ff';
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.moveTo(-8, 20);
+                ctx.lineTo(0, 20 + Math.random() * 15 + 10);
+                ctx.lineTo(8, 20);
+                ctx.closePath();
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#00ff66';
+                ctx.fillStyle = '#00ff66';
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // Render Crosshair
+            if(!isNaN(mouse.x) && !isNaN(mouse.y)) {
+                ctx.save();
+                ctx.translate(mouse.x, mouse.y);
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = '#00f3ff';
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, 2, 0, Math.PI*2);
+                ctx.fillStyle = '#00f3ff';
+                ctx.fill();
+                
+                ctx.rotate(Date.now() / 500);
+                ctx.beginPath();
+                ctx.arc(0, 0, 20, 0, Math.PI*2);
+                ctx.setLineDash([10, 15]);
+                ctx.strokeStyle = '#00f3ff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            ctx.restore();
+
+            if(freezeTimer > 0) {
+                ctx.fillStyle = 'rgba(0, 243, 255, 0.05)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function updateTimer() {
+            if (gameState !== 'PLAYING' || isPaused) return;
+            if (freezeTimer > 0) {
+                freezeTimer--;
+                return; 
+            }
+            if(timeLeft <= 0) {
+                endGame();
+                return;
+            }
+            timeLeft--;
+            els.timer.innerText = timeLeft;
+            if (timeLeft <= 10) {
+                els.timer.classList.add('animate-pulse');
+                els.timer.classList.replace('text-glow-red', 'text-glow-orange');
+            }
+        }
+
+        function startGame() {
+            if (gameState === 'PLAYING') return; // Protect against double start clicks
+            initAudio();
+            gameState = 'PLAYING';
+            isPaused = false;
+            
+            screens.start.style.opacity = '0';
+            setTimeout(() => screens.start.classList.add('hidden'), 400);
+            screens.end.style.opacity = '0';
+            setTimeout(() => screens.end.classList.add('hidden'), 400);
+            screens.review.style.opacity = '0';
+            setTimeout(() => screens.review.classList.add('hidden'), 400);
+            
+            screens.hud.classList.remove('hud-hidden');
+            screens.hud.classList.add('flex');
+            
+            // Force redraw canvas dimension strictly after unhiding HUD
+            setTimeout(resizeCanvas, 50);
+
+            currentQuestions = buildQuestionSet();
+            currentQIndex = 0;
+            score = 0;
+            timeLeft = 60;
+            consecutiveCorrect = 0;
+            freezeTimer = 0;
+            isTransitioning = false;
+            gameHistory = [];
+            
+            els.score.innerText = '0';
+            els.timer.innerText = '60';
+            els.timer.classList.remove('animate-pulse');
+            els.timer.classList.replace('text-glow-orange', 'text-glow-red');
+            screens.hud.classList.remove('bg-freeze');
+            
+            particles = []; lasers = []; floatingTexts = []; powerUps = []; bombs = [];
+
+            // Delay round start slightly to ensure canvas is fully ready
+            setTimeout(startRound, 100);
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            if(animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        function endGame() {
+            gameState = 'END';
+            clearInterval(timerInterval);
+            if(animationFrameId) cancelAnimationFrame(animationFrameId);
+            
+            screens.hud.classList.add('hud-hidden');
+            screens.hud.classList.remove('flex');
+            
+            screens.end.classList.remove('hidden');
+            void screens.end.offsetWidth;
+            screens.end.style.opacity = '1';
+
+            if(score >= 5) {
+                els.endTitle.innerText = "MISSION CLEAR";
+                els.endTitle.className = "font-scifi text-4xl md:text-5xl font-black mb-2 text-[#00f3ff] text-glow-blue";
+                els.endMsg.innerText = "Perfect! Kỹ năng ngắm bắn tuyệt đối.";
+            } else if(score >= 3) {
+                els.endTitle.innerText = "GOOD JOB";
+                els.endTitle.className = "font-scifi text-4xl md:text-5xl font-black mb-2 text-[#00ff66] text-glow-green";
+                els.endMsg.innerText = "Thành tích khá tốt, phi công!";
+            } else {
+                els.endTitle.innerText = "MISSION FAILED";
+                els.endTitle.className = "font-scifi text-4xl md:text-5xl font-black mb-2 text-[#ff003c] text-glow-red";
+                els.endMsg.innerText = "Hệ thống khuyến nghị bạn nên ôn tập lại.";
+            }
+            els.finalScore.innerText = `${score}`;
+        }
+
+        // Attach core UI events
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-restart').addEventListener('click', startGame);
+        
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            if(gameState === 'PLAYING' && !isPaused) {
+                isPaused = true;
+                screens.pause.classList.remove('hidden');
+            }
+        });
+        
+        document.getElementById('btn-resume').addEventListener('click', () => {
+            isPaused = false;
+            screens.pause.classList.add('hidden');
+        });
+
+        document.getElementById('btn-review').addEventListener('click', () => {
+            screens.end.style.opacity = '0';
+            setTimeout(() => screens.end.classList.add('hidden'), 400);
+            
+            screens.review.classList.remove('hidden');
+            setTimeout(() => screens.review.style.opacity = '1', 10);
+            
+            els.reviewContent.innerHTML = '';
+            gameHistory.forEach((item, index) => {
+                const isWin = item.isCorrect;
+                const div = document.createElement('div');
+                div.className = `p-4 md:p-5 rounded-xl border shadow-md ${isWin ? 'bg-green-900/10 border-green-500/40' : 'bg-red-900/10 border-red-500/40'}`;
+                
+                let optHTML = '';
+                item.question.options.forEach(opt => {
+                    let style = "text-gray-400";
+                    if(opt.id === item.question.correct) style = "text-green-400 font-bold bg-green-900/20 px-3 py-1 rounded-md shadow-inner";
+                    else if(opt.id === item.userAns && !isWin) style = "text-red-400 line-through bg-red-900/20 px-3 py-1 rounded-md";
+                    optHTML += `<div class="${style} mt-2 py-1 text-sm md:text-base lg:text-lg leading-relaxed">${opt.id}. ${opt.text}</div>`;
+                });
+
+                div.innerHTML = `
+                    <div class="flex items-start justify-between mb-3 border-b border-gray-700/50 pb-2">
+                        <div class="font-bold font-sans text-base md:text-lg lg:text-xl ${isWin ? 'text-green-400' : 'text-red-400'}">Câu ${index + 1}: <span class="text-white font-normal">${item.question.q}</span></div>
+                    </div>
+                    <div class="pl-2">
+                        ${optHTML}
+                    </div>
+                `;
+                els.reviewContent.appendChild(div);
+            });
+            setTimeout(() => {
+                if(window.renderMathInElement) {
+                    try {
+                        renderMathInElement(els.reviewContent, {delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}]});
+                    } catch(e) {}
+                }
+            }, 50);
+        });
+
+        document.getElementById('btn-close-review').addEventListener('click', () => {
+            screens.review.style.opacity = '0';
+            setTimeout(() => {
+                screens.review.classList.add('hidden');
+                screens.end.classList.remove('hidden');
+                setTimeout(() => screens.end.style.opacity = '1', 10);
+            }, 400);
+        });
+
+        // Event tracking for the game Canvas area
+        window.addEventListener('mousemove', updateMouseCoords);
+        window.addEventListener('mousedown', handleInteraction);
+        
+        window.addEventListener('touchmove', (e) => {
+            updateMouseCoords(e);
+            if(gameState === 'PLAYING' && !isPaused) {
+                // Ignore touch events that land on UI buttons so we don't break them
+                if (e.target && e.target.closest && !e.target.closest('button')) {
+                    e.preventDefault(); 
+                }
+            }
+        }, {passive: false});
+        window.addEventListener('touchstart', handleInteraction, {passive: false});
+
+        // Initialize display
+        screens.start.style.opacity = '1';
+        resizeCanvas();
+    </script>
+</body>
+</html>
